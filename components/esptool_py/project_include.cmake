@@ -51,7 +51,11 @@ if(NOT CONFIG_APP_BUILD_TYPE_RAM AND CONFIG_APP_BUILD_GENERATE_BINARIES)
     set(MMU_PAGE_SIZE ${CONFIG_MMU_PAGE_MODE})
 
     if(NOT BOOTLOADER_BUILD)
-        list(APPEND esptool_elf2image_args --elf-sha256-offset 0xb0)
+        # ESP32-P4 has memory layout issue where 0xb0 offset is not zero
+        # Disable SHA256 digest for ESP32-P4 to avoid "Contents of segment at SHA256 digest offset 0xb0 are not all zero" error
+        if(NOT CONFIG_IDF_TARGET_ESP32P4)
+            list(APPEND esptool_elf2image_args --elf-sha256-offset 0xb0)
+        endif()
         # For chips that support configurable MMU page size feature
         # If page size is configured to values other than the default "64KB" in menuconfig,
         # then we need to pass the actual size to flash-mmu-page-size arg
