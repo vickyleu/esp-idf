@@ -74,8 +74,9 @@ MEMORY
   /* PSRAM mapped constant data */
   drom_seg (R) :                     org = 0x48000020, len = IDROM_SEG_SIZE - 0x20
 #else
-  /* Flash mapped constant data */
-  drom_seg (R) :                     org = 0x40000020, len = IDROM_SEG_SIZE - 0x20
+  /* Flash mapped constant data - FIXED: Use separate address from irom_seg (0x40000020) */
+  /* Following ESP32-S3 design: use 0x3C000020 for data segment to avoid overlap */
+  drom_seg (R) :                     org = 0x3C000020, len = IDROM_SEG_SIZE - 0x20
 #endif // CONFIG_SPIRAM_RODATA
 
   /* (See irom_seg for meaning of 0x20 offset in the above.) */
