@@ -76,6 +76,13 @@ void esp_rtc_init(void)
 
 __attribute__((weak)) void esp_clk_init(void)
 {
+    // [WUKONG] 禁用 RTC WDT
+    {
+        wdt_hal_context_t rtc_wdt_ctx = {.inst = WDT_RWDT, .rwdt_dev = &RTCCNTL};
+        wdt_hal_write_protect_disable(&rtc_wdt_ctx);
+        wdt_hal_disable(&rtc_wdt_ctx);
+        wdt_hal_write_protect_enable(&rtc_wdt_ctx);
+    }
     assert(rtc_clk_xtal_freq_get() == SOC_XTAL_FREQ_40M);
 
     bool rc_fast_d256_is_enabled = rtc_clk_8md256_enabled();
@@ -284,6 +291,11 @@ __attribute__((weak)) void esp_perip_clk_init(void)
         usb_serial_jtag_ll_enable_bus_clock(false);
 #endif
     }
+
+    // [WUKONG] USB Serial JTAG 时保留 USB 时钟
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED
+    common_perip_clk &= ~SYSTEM_USB_CLK_EN;
+#endif
 
     //Reset the communication peripherals like I2C, SPI, UART, I2S and bring them to known state.
     common_perip_clk |= SYSTEM_I2S0_CLK_EN |
