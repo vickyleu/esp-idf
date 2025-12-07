@@ -199,10 +199,12 @@ static void do_secondary_init(void)
 
 static void start_cpu0_default(void)
 {
+    esp_rom_printf("STARTUP:core_init\n");
     // Initialize core components and services.
     // Operations that needs the cache to be disabled have to be done here.
     do_core_init();
 
+    esp_rom_printf("STARTUP:global_ctors\n");
     // Execute constructors.
     do_global_ctors();
 
@@ -211,6 +213,7 @@ static void start_cpu0_default(void)
      * Don't touch the cache/MMU until the OS is up.
      */
 
+    esp_rom_printf("STARTUP:secondary_init\n");
     // Execute init functions of other components; blocks
     // until all cores finish (when !CONFIG_ESP_SYSTEM_SINGLE_CORE_MODE).
     do_secondary_init();
@@ -219,6 +222,7 @@ static void start_cpu0_default(void)
     s_system_full_inited = true;
 #endif
 
+    esp_rom_printf("STARTUP:start_app\n");
     esp_startup_start_app();
 
     ESP_INFINITE_LOOP();
