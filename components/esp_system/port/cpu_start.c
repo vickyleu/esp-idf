@@ -931,8 +931,6 @@ void IRAM_ATTR call_start_cpu0(void)
     // Initialize other parts of the system, including other CPUs.
     // As CPU0 needs to disable the cache in system_early_init function and in the CORE stage of ESP SYSTEM INIT FN, the
     // other cores are not allowed to run with the cache until the SECONDARY stage of ESP SYSTEM INIT FN.
-    esp_rom_printf("CPUSTART:early_init\n");
     system_early_init(rst_reas);
-    esp_rom_printf("CPUSTART:startup_fn\n");
     SYS_STARTUP_FN();
 }
