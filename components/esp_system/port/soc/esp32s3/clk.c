@@ -76,13 +76,14 @@ void esp_rtc_init(void)
 
 __attribute__((weak)) void esp_clk_init(void)
 {
-    // [WUKONG] 禁用 RTC WDT
+    // [WUKONG] 禁用 RTC WDT，避免多核启动超时
     {
         wdt_hal_context_t rtc_wdt_ctx = {.inst = WDT_RWDT, .rwdt_dev = &RTCCNTL};
         wdt_hal_write_protect_disable(&rtc_wdt_ctx);
         wdt_hal_disable(&rtc_wdt_ctx);
         wdt_hal_write_protect_enable(&rtc_wdt_ctx);
     }
+    
     assert(rtc_clk_xtal_freq_get() == SOC_XTAL_FREQ_40M);
 
     bool rc_fast_d256_is_enabled = rtc_clk_8md256_enabled();
@@ -90,16 +91,10 @@ __attribute__((weak)) void esp_clk_init(void)
     rtc_clk_fast_src_set(SOC_RTC_FAST_CLK_SRC_RC_FAST);
 
 #ifdef CONFIG_BOOTLOADER_WDT_ENABLE
-    // WDT uses a SLOW_CLK clock source. After a function select_rtc_slow_clk a frequency of this source can changed.
-    // If the frequency changes from 150kHz to 32kHz, then the timeout set for the WDT will increase 4.6 times.
-    // Therefore, for the time of frequency change, set a new lower timeout value (1.6 sec).
-    // This prevents excessive delay before resetting in case the supply voltage is drawdown.
-    // (If frequency is changed from 150kHz to 32kHz then WDT timeout will increased to 1.6sec * 150/32 = 7.5 sec).
     wdt_hal_context_t rtc_wdt_ctx = {.inst = WDT_RWDT, .rwdt_dev = &RTCCNTL};
     uint32_t stage_timeout_ticks = (uint32_t)(1600ULL * rtc_clk_slow_freq_get_hz() / 1000ULL);
     wdt_hal_write_protect_disable(&rtc_wdt_ctx);
     wdt_hal_feed(&rtc_wdt_ctx);
-    //Bootloader has enabled RTC WDT until now. We're only modifying timeout, so keep the stage and timeout action the same
     wdt_hal_config_stage(&rtc_wdt_ctx, WDT_STAGE0, stage_timeout_ticks, WDT_STAGE_ACTION_RESET_RTC);
     wdt_hal_write_protect_enable(&rtc_wdt_ctx);
 #endif
@@ -115,7 +110,6 @@ __attribute__((weak)) void esp_clk_init(void)
 #endif
 
 #ifdef CONFIG_BOOTLOADER_WDT_ENABLE
-    // After changing a frequency WDT timeout needs to be set for new frequency.
     stage_timeout_ticks = (uint32_t)((uint64_t)CONFIG_BOOTLOADER_WDT_TIME_MS * rtc_clk_slow_freq_get_hz() / 1000ULL);
     wdt_hal_write_protect_disable(&rtc_wdt_ctx);
     wdt_hal_feed(&rtc_wdt_ctx);
@@ -131,8 +125,7 @@ __attribute__((weak)) void esp_clk_init(void)
     bool res = rtc_clk_cpu_freq_mhz_to_config(new_freq_mhz, &new_config);
     assert(res);
 
-    // Wait for UART TX to finish, otherwise some UART output will be lost
-    // when switching APB frequency
+    // Wait for UART TX to finish before switching frequency
     if (CONFIG_ESP_CONSOLE_ROM_SERIAL_PORT_NUM >= 0) {
         esp_rom_output_tx_wait_idle(CONFIG_ESP_CONSOLE_ROM_SERIAL_PORT_NUM);
     }
@@ -292,11 +285,6 @@ __attribute__((weak)) void esp_perip_clk_init(void)
 #endif
     }
 
-    // [WUKONG] USB Serial JTAG 时保留 USB 时钟
-#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED
-    common_perip_clk &= ~SYSTEM_USB_CLK_EN;
-#endif
-
     //Reset the communication peripherals like I2C, SPI, UART, I2S and bring them to known state.
     common_perip_clk |= SYSTEM_I2S0_CLK_EN |
 #if CONFIG_ESP_CONSOLE_UART_NUM != 0
@@ -321,6 +309,11 @@ __attribute__((weak)) void esp_perip_clk_init(void)
                         SYSTEM_SPI2_DMA_CLK_EN |
                         SYSTEM_SPI3_DMA_CLK_EN;
     common_perip_clk1 = 0;
+
+    // [WUKONG] USB Serial JTAG 时保留 USB 时钟（必须在 |= 之后）
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED
+    common_perip_clk &= ~SYSTEM_USB_CLK_EN;
+#endif
 
     /* Disable some peripheral clocks. */
     CLEAR_PERI_REG_MASK(SYSTEM_PERIP_CLK_EN0_REG, common_perip_clk);
